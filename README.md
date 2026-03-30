@@ -1,139 +1,140 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/kirM_zQk)
-[![Open in Codespaces](https://classroom.github.com/assets/launch-codespace-2972f46106e565e64193e422d61a12cf1da4916b45550586e14ef0a7c637dd04.svg)](https://classroom.github.com/open-in-codespaces?assignment_repo_id=21557725)
-# Objectives
+# Multi-Label Text Classification with Bidirectional LSTM
 
-The learning objectives of this assignment are to:
-1. build a neural network for a community task 
-2. practice tuning model hyper-parameters
+A deep learning pipeline for multi-label text classification built in Keras/TensorFlow, using a DistilRoBERTa tokenizer with a custom Bidirectional LSTM classifier. Evaluated on a held-out test set via a CodaBench competition benchmark.
 
-# Read about the CodaBench Competition
+---
 
-You will be participating in a class-wide competition.
-The competition website is:
+## Architecture
 
-[https://www.codabench.org/competitions/4893/?secret_key=6a896612-e56d-47aa-9b49-2a835cfc3827](https://www.codabench.org/competitions/11263/?secret_key=a4fd79a0-91e5-409f-9c36-3bbd58737296)
+Rather than fine-tuning a full transformer (which is computationally expensive), this model uses the **DistilRoBERTa tokenizer** for subword tokenization and feeds token IDs into a lightweight but expressive **Bidirectional LSTM** stack:
 
-You should visit that site and read all the details of the competition, which
-include the task definition, how your model will be evaluated, the format of
-submissions to the competition, etc.
-
-# Create a CodaBench account
-
-You must create a CodaBench account and join the competition:
-1. Visit the competition website.
-
-2. In the upper right corner of the page, you should see a "Sign Up" button.
-Click that and go through the process to create an account.
-**Please use your @arizona.edu account when signing up.**
-Your username will be displayed publicly on a leaderboard showing everyone's
-scores.
-**If you wish to remain anonymous, please select a username that does not reveal
-your identity.**
-Your instructor will still be able to match your score with your name via your
-email address, but your email address will not be visible to other students. 
-
-3. Return to the competition website and click the "My Submissions" tab, accept
-the terms and conditions of the competition, and register for the task.
-
-4. Wait for your instructor to manually approve your request.
-This may take a few days.
-
-5. You should then be able to return to the "My Submissions" tab and see a
-"Submission upload" form.
-That means you are fully registered for the task.
-
-# Clone the repository
-
-Clone the repository created by GitHub Classroom to your local machine:
 ```
-git clone https://github.com/ua-ista-457/graduate-project-<your-username>.git
+Input IDs (max_length=128)
+        ↓
+Embedding Layer (vocab_size × 256)
+        ↓
+BiLSTM (96 units, return_sequences=True)
+        ↓
+BiLSTM (48 units)
+        ↓
+Dense (128, ReLU) → Dropout (0.4)
+        ↓
+Dense (64, ReLU)  → Dropout (0.3)
+        ↓
+Dense (num_labels, Sigmoid)
 ```
-You are now ready to begin working on the assignment.
 
-# Download the data
+This hybrid approach keeps inference fast while still benefiting from the subword vocabulary of a modern tokenizer.
 
-Go to the "Get Started" tab on the CodaBench site, and click on the "Files"
-sub-tab.
-You should see a button to download the training and development data for the
-task.
-Download and unzip that data into your cloned repository directory.
-Please **do not commit the data to the repository**.
+---
 
-When the test phase of the competition begins, you may return to the "Files"
-tab to download the unlabeled test data for the task.
+## Key Design Choices
 
-# Write your code
+| Choice | Rationale |
+|---|---|
+| DistilRoBERTa tokenizer (no transformer weights) | Subword tokenization quality without transformer compute cost |
+| Bidirectional LSTM × 2 | Captures forward and backward context; stacked for richer representations |
+| Sigmoid output (not Softmax) | Labels are independent — a sample can belong to multiple classes |
+| Binary cross-entropy loss | Standard for multi-label problems |
+| Micro F1 as primary metric | Accounts for label imbalance across all classes jointly |
+| Threshold tuning post-training | Decouples classification threshold from model training; improves F1 directly |
 
-You should design a neural network model to perform the task described on the
-CodaBench site.
-Your code should train a model on the provided training data and tune
-hyper-parameters on the provided development data.
-Your code should be able to make predictions on either the development data
-or the test data.
-Your code should package up its predictions in a `submission.zip` file,
-following the formatting instructions on CodaBench.
+---
 
-You must create and train your neural network in the Keras framework that we
-have been using in the class.
-You should train and tune your model using the training and development data
-that you downloaded from the CodaBench site.
+## Project Structure
 
-**If you would like to use any additional resource to train your model, you must
-first ask for permission in the `#programming` channel on the class's Slack
-workspace.**
+```
+.
+├── nn.py               # Main pipeline: train, tune, predict
+├── bilstm.weights.h5   # Saved model weights (after training)
+├── data/
+│   ├── train.csv       # Training data (not committed)
+│   └── dev.csv         # Development/validation data (not committed)
+└── submission.zip      # CodaBench-formatted predictions
+```
 
-There is some sample code in this repository from which you could start.
-This code is described briefly on the CodaBench site.
-You should feel free to delete this code entirely and start from scratch if
-you prefer.
+---
 
-# Test your model predictions on the development set
+## Setup
 
-During the development phase of the competition, the CodaBench site will expect
-predictions on the development set.
-To test the performance of your model, run your model on the development data,
-format your model predictions as instructed on the CodaBench site, and upload
-your model's predictions on the "My Submissions" tab of the CodaBench site.
+```bash
+pip install tensorflow transformers datasets scikit-learn pandas numpy
+```
 
-During the development phase, you are allowed to upload predictions many times.
-You are **strongly** encouraged to upload your model's development set
-predictions to CodaBench after every significant change to your code to make
-sure you have all the formatting correct.
+Python 3.9+ recommended. GPU strongly recommended for training.
 
-Note that [sometimes submissions on CodaBench sometimes get stuck](https://github.com/codalab/codabench/issues/1184).
-If you find that your submission is not scored within 1 minute, cancel the
-submission and re-submit it.
+---
 
-# Submit your model predictions on the test set
+## Usage
 
-When the test phase of the competition begins (consult the CodaBench site for
-the exact timing), the instructor will update the CodaBench site to expect
-predictions on the test set, rather than predictions on the development set.
-The instructor will also release the unlabeled test set on CodaBench as
-described above under "Download the Data".
-To test the performance of your model, download the test data, run your model on
-the test data, format your model predictions as instructed on the CodaBench
-site, and upload your model's predictions on the "My Submissions" tab of the
-CodaBench site.
+### 1. Train
 
-During the test phase, you are allowed to upload predictions only once.
-This is why it is critical to debug any formatting problems during the
-development phase.
- 
-# Grading
+```bash
+python nn.py train
+```
 
-You will be graded first by your model's accuracy, and second on how well your
-model ranks in the competition.
-If your model achieves better accuracy on the test set than the baseline model
-included in this repository, you will get at least a B.
-If your model achieves better accuracy on the test set than another baseline
-that the instructor will reveal after the competition, you will get an A.
-All models within the same letter grade will be distributed evenly across the
-range, based on their rank.
-So for example, the highest ranked model in the A range will get 100%, and the
-lowest ranked model in the B range will get 80%.
+Trains the BiLSTM model on `data/train.csv`, validates on `data/dev.csv`, and saves weights to `bilstm.weights.h5`.
 
-**If you train your neural network with any library other than Tensorflow/Keras,
-or you use an external resource that you do not obtain permission for in the
-`#programming` channel of the course's Slack workspace, you will lose 10% (a
-letter grade) from your score.**
+Training uses:
+- **Early stopping** (patience=3) on validation micro F1
+- **ReduceLROnPlateau** (patience=1, factor=0.5) to decay learning rate when progress stalls
+- Up to 8 epochs (usually converges earlier via early stopping)
+
+### 2. Tune Classification Threshold
+
+```bash
+python nn.py tune
+```
+
+Sweeps thresholds from 0.20 → 0.60 on the dev set and reports the threshold that maximizes micro F1. Use this value in the predict step.
+
+### 3. Predict
+
+```bash
+# On dev set (default)
+python nn.py predict --input data/dev.csv --threshold 0.35
+
+# On test set
+python nn.py predict --input data/test.csv --threshold 0.35
+```
+
+Outputs a `submission.zip` containing `submission.csv` formatted for CodaBench upload.
+
+---
+
+## Hyperparameters
+
+| Parameter | Value |
+|---|---|
+| Tokenizer | `distilroberta-base` |
+| Max sequence length | 128 |
+| Batch size | 32 |
+| Embedding dim | 256 |
+| BiLSTM units (layer 1) | 96 |
+| BiLSTM units (layer 2) | 48 |
+| Learning rate (initial) | 1e-3 |
+| Dropout | 0.4 / 0.3 |
+| Loss | Binary cross-entropy |
+| Optimizer | Adam |
+
+---
+
+## Data Format
+
+Input CSVs must follow this structure:
+
+```
+text,label_1,label_2,...,label_n
+"Some input text.",1,0,...,1
+```
+
+- First column: raw text
+- Remaining columns: binary labels (0 or 1), one per class
+
+---
+
+## Notes
+
+- Model weights are saved separately from architecture (`bilstm.weights.h5`), making it easy to reload and re-predict without retraining.
+- The threshold tuning step is intentionally separate from training — this lets you optimize the decision boundary directly on F1 rather than relying on a fixed 0.5 cutoff, which often underperforms on imbalanced label distributions.
+- Data files are excluded from version control. Download from the competition's Files tab.
